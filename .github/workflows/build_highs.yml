@@ -1,0 +1,21 @@
+# CI workflow for the rtctools-highs wheel.
+# Builds on Linux (ubuntu-latest) and Windows (windows-latest via MSYS2/MinGW64),
+# runs the end-to-end test, and publishes to PyPI on version tags.
+#
+# TODO: implement build matrix, cibuildwheel config, MSYS2 setup, and PyPI
+# trusted publisher (OIDC) steps — see delivery plan for details.
+
+name: Build rtctools-highs
+
+on:
+  push:
+    tags:
+      - "v*"
+  pull_request:
+
+jobs:
+  placeholder:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "Workflow stub — implementation pending"

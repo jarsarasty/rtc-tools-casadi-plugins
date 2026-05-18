@@ -1,0 +1,13 @@
+# Default: normalise to LF in the repo, checkout as native on each platform
+* text=auto
+
+# Shell scripts must stay LF even on Windows (MSYS2/bash requires it)
+*.sh text eol=lf
+
+# Windows-only scripts use CRLF
+*.ps1 text eol=crlf
+
+# Binaries
+*.dll binary
+*.so binary
+*.whl binary
