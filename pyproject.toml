@@ -37,6 +37,11 @@ classifiers = [
 Homepage = "https://github.com/rtc-tools/rtctools-casadi-plugins"
 Issues = "https://github.com/rtc-tools/rtctools-casadi-plugins/issues"
 
+[dependency-groups]
+dev = [
+    "pytest >= 8.2.0",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/rtctools_highs"]
 # cibuildwheel stages the compiled plugin (libcasadi_conic_highs.* and its
