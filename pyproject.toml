@@ -1,0 +1,54 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "rtctools-highs"
+version = "1.14.0"
+license = { file = "LICENSE" }
+description = "CasADi HiGHS solver plugin for RTC-Tools (pre-built binary wheel)."
+readme = "README.md"
+authors = [
+    {name = "Deltares"}
+]
+maintainers = [
+    {name = "Deltares"}
+]
+requires-python = ">=3.10"
+# Exact pin: the compiled plugin is ABI-coupled to the CasADi version it was
+# built against. Bump this together with the CasADi build whenever CasADi is
+# upgraded.
+dependencies = [
+    "casadi==3.7.2",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+]
+
+[project.urls]
+Homepage = "https://github.com/rtc-tools/rtctools-casadi-plugins"
+Issues = "https://github.com/rtc-tools/rtctools-casadi-plugins/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rtctools_highs"]
+# cibuildwheel stages the compiled plugin (libcasadi_conic_highs.* and its
+# runtime dependencies) into src/rtctools_highs/ before invoking the build
+# backend. Use `artifacts` (not `include`) so hatchling picks up untracked files.
+artifacts = [
+    "/src/rtctools_highs/*.dll",
+    "/src/rtctools_highs/*.so",
+    "/src/rtctools_highs/*.dylib",
+]
+
+[tool.hatch.build.targets.sdist]
+# Exclude sdist: the compiled binaries cannot be built from source by pip.
+# Prevents pip falling back to a broken source build on unsupported platforms.
+include = []
