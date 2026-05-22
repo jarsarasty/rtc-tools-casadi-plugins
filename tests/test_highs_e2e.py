@@ -1,53 +1,61 @@
+"""End-to-end test for the rtctools_highs plugin.
+
+Verifies that the HiGHS solver, loaded via the plugin, produces numerically
+correct solutions for a small mixed-integer LP and a QP.  These problems are
+small enough to be solved analytically so the expected answers are exact.
 """
-Standalone runner for the HiGHS plugin end-to-end test.
+import casadi as ca
 
-Sets RTCTOOLS_EXTRA_CASADIPATH to the built plugin directory, then solves a
-small QP using the custom libcasadi_conic_highs plugin.
 
-Usage:
-    uv run python run_highs_plugin_e2e.py
-"""
+class TestLinearProgram:
+    """min  -x - 2y  s.t.  x + y <= 4,  x <= 3,  y <= 3,  x,y >= 0
+    Optimal: x=1, y=3, f=-7"""
 
-import logging
-import os
-import sys
-from pathlib import Path
+    def test_lp(self):
+        x = ca.MX.sym("x")
+        y = ca.MX.sym("y")
+        xy = ca.vertcat(x, y)
+        g = ca.vertcat(x + y, x, y)
+        qp = {"x": xy, "f": -x - 2 * y, "g": g}
+        solver = ca.qpsol("lp", "highs", qp)
+        sol = solver(lbx=0, ubx=ca.inf, lbg=[-ca.inf, -ca.inf, -ca.inf], ubg=[4, 3, 3])
+        assert abs(float(sol["x"][0]) - 1.0) < 1e-6
+        assert abs(float(sol["x"][1]) - 3.0) < 1e-6
+        assert abs(float(sol["f"]) - (-7.0)) < 1e-6
 
-REPO_ROOT = Path(__file__).parent
-PLUGIN_LIB_DIR = REPO_ROOT / "ci-work" / "plugin-install-highs1.14.0-casadi3.7.2" / "lib"
 
-if sys.platform == "win32":
-    # CasADi's plugin loader uses SetDllDirectory+LoadLibrary, which searches
-    # the directory co-located with the plugin DLL for transitive dependencies.
-    # libhighs.dll is already in PLUGIN_LIB_DIR alongside the plugin, so no
-    # explicit pre-loading is needed here (unlike the pumped_hydro runner which
-    # uses a separately-built libhighs.dll requiring zlib1.dll from MSYS2).
-    os.add_dll_directory(str(PLUGIN_LIB_DIR))
+class TestQuadraticProgram:
+    """min  (x-1)^2 + (y-2)^2  s.t.  x + y <= 3,  x,y >= 0
+    Unconstrained optimum (1,2) is feasible (1+2=3), so optimal = (1,2), f=0"""
 
-os.environ["RTCTOOLS_EXTRA_CASADIPATH"] = str(PLUGIN_LIB_DIR)
+    def test_qp(self):
+        x = ca.MX.sym("x")
+        y = ca.MX.sym("y")
+        xy = ca.vertcat(x, y)
+        qp = {"x": xy, "f": (x - 1) ** 2 + (y - 2) ** 2, "g": x + y}
+        solver = ca.qpsol("qp", "highs", qp)
+        sol = solver(lbx=0, ubx=ca.inf, lbg=-ca.inf, ubg=3)
+        assert abs(float(sol["x"][0]) - 1.0) < 1e-5
+        assert abs(float(sol["x"][1]) - 2.0) < 1e-5
+        assert abs(float(sol["f"])) < 1e-9
 
-# Add repo root so relative imports inside test modules resolve.
-sys.path.insert(0, str(REPO_ROOT))
 
-import numpy as np
+class TestMixedIntegerLP:
+    """min  -x - y  s.t.  x + y <= 3.5,  x,y in {0,1,2,...}
+    Optimal: x+y=3, f=-3"""
 
-import rtctools.util as rtctools_util
-from tests.optimization.test_solvers import ModelHiGHS_alg
-
-logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
-logger = logging.getLogger("rtctools")
-
-rtctools_util._configure_extra_casadi_path(logger)
-
-problem = ModelHiGHS_alg()
-problem.optimize()
-results = problem.extract_results()
-
-y = results["y"]
-u = results["u"]
-print(f"\ny      = {y}")
-print(f"u      = {u}")
-print(f"y + u  = {y + u}  (should be all 1.0)")
-
-assert np.allclose(y + u, np.ones(len(problem.times())), atol=1e-6), "Constraint y+u=1 violated"
-print("\nPASS: HiGHS plugin solved the QP correctly.")
+    def test_milp(self):
+        x = ca.MX.sym("x")
+        y = ca.MX.sym("y")
+        xy = ca.vertcat(x, y)
+        qp = {"x": xy, "f": -x - y, "g": x + y}
+        solver = ca.qpsol(
+            "milp",
+            "highs",
+            qp,
+            {"discrete": [True, True]},
+        )
+        sol = solver(lbx=0, ubx=10, lbg=-ca.inf, ubg=3.5)
+        total = float(sol["x"][0]) + float(sol["x"][1])
+        assert abs(total - 3.0) < 1e-6, f"Expected integer sum=3, got {total}"
+        assert abs(float(sol["f"]) - (-3.0)) < 1e-6

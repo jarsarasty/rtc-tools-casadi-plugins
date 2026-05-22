@@ -8,13 +8,19 @@ intentional -- it is what makes the HiGHS solver available to CasADi without
 any manual configuration. rtc-tools triggers this automatically at its entry
 points via ``try: import rtctools_highs; except ImportError: pass``.
 
-**Windows limitation**: ``os.add_dll_directory`` is called before CasADi is
-imported so that ``libhighs.dll`` resolves from the wheel directory rather than
-from the CasADi bundled install on PATH. However, if ``libhighs.dll`` is
-already resident in the process (e.g. because a HiGHS solve was performed via
-the bundled CasADi before this module was imported), Windows will reuse the
-cached DLL handle and the fix has no effect. Import ``rtctools_highs`` before
-any CasADi solver calls to ensure correct DLL loading.
+**Windows DLL isolation**: the wheel is processed by ``delvewheel`` at build
+time, which renames transitive dependencies (e.g. ``libhighs.dll`` becomes
+``libhighs-<hash>.dll``) and patches the plugin's import table accordingly.
+This eliminates naming conflicts with the ``libhighs.dll`` bundled inside
+CasADi. ``os.add_dll_directory`` is called so that Windows can locate the
+renamed dependencies when CasADi's plugin loader opens the plugin DLL.
+The handle must stay alive for the directory registration to remain active.
+
+Note: ``os.add_dll_directory`` is only effective for loaders that use
+``LoadLibraryEx`` with ``LOAD_LIBRARY_SEARCH_USER_DIRS``. CasADi 3.7.x uses
+the legacy ``LoadLibrary`` path, so the renamed deps are found via the
+``_rtctools_highs_libs`` subdirectory that ``delvewheel`` adds to PATH at
+import time rather than via the DLL directory registration.
 
 Not intended for use on macOS (the CasADi bundled HiGHS is used there instead).
 """
@@ -41,16 +47,14 @@ if not any(_plugin_dir.glob(f"libcasadi_conic_highs*{_suffix}")):
     )
 
 if sys.platform == "win32":
-    # On Windows, libcasadi_conic_highs.dll's transitive dependency (libhighs.dll) is
-    # resolved via the standard DLL search order (PATH). Without this call, the bundled
-    # CasADi libhighs.dll on PATH wins over the one co-located with the plugin -- wrong
-    # version, silent ABI mismatch. os.add_dll_directory() inserts the plugin dir into
-    # the DLL search path at the highest priority, fixing transitive dep resolution.
-    # Available from Python 3.8+; pyproject.toml enforces requires-python = ">=3.10".
-    # Drop this workaround once CasADi 3.8 ships with AddDllDirectory support (#4340).
+    # delvewheel injects a _rtctools_highs_libs/ loader shim at the top of this
+    # file at repair time; the shim adds the libs directory to PATH so that
+    # CasADi's legacy LoadLibrary() call finds the renamed transitive deps.
+    # os.add_dll_directory is also registered as a belt-and-suspenders measure
+    # for any future CasADi version that adopts LoadLibraryEx.
     _dll_dir = os.add_dll_directory(str(_plugin_dir))  # handle must stay alive
 
-import casadi  # noqa: E402 — must come after os.add_dll_directory on Windows
+import casadi  # noqa: E402
 
 _current_parts = [p for p in casadi.GlobalOptions.getCasadiPath().split(os.pathsep) if p]
 _plugin_dir_str = str(_plugin_dir)

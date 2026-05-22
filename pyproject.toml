@@ -34,12 +34,13 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/rtc-tools/rtctools-casadi-plugins"
-Issues = "https://github.com/rtc-tools/rtctools-casadi-plugins/issues"
+Homepage = "https://github.com/rtc-tools/rtc-tools-casadi-plugins"
+Issues = "https://github.com/rtc-tools/rtc-tools-casadi-plugins/issues"
 
 [dependency-groups]
 dev = [
     "pytest >= 8.2.0",
+    "delvewheel >= 1.9.0",
 ]
 
 [tool.hatch.build.targets.wheel]
