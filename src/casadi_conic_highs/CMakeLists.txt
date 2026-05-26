@@ -162,11 +162,10 @@ endif()
 if(NOT MSVC)
     target_compile_options(casadi_conic_highs PRIVATE -fvisibility=hidden)
     if(MINGW)
-        # Share the MinGW C++ runtime with CasADi's wheel DLLs to avoid two
-        # copies of libstdc++ in the same process, which would break exceptions
-        # and typeinfo across the plugin boundary.
-        target_link_options(casadi_conic_highs PRIVATE
-            -shared-libstdc++ -shared-libgcc)
+        # Do NOT pass -static-libstdc++/-static-libgcc: the plugin must share
+        # the MinGW C++ runtime with CasADi's wheel DLLs to avoid two copies
+        # of libstdc++ in the same process (breaks exceptions and typeinfo).
+        # Shared linking is the MinGW default; no extra flags needed.
     endif()
 endif()
 

@@ -51,7 +51,7 @@ jobs:
 
       - name: Repair wheel with auditwheel
         run: |
-          uv run auditwheel repair --plat manylinux_2_28_x86_64 --wheel-dir dist/ dist/*.whl
+          uv run auditwheel repair --plat manylinux_2_28_x86_64 --exclude libcasadi.so.3.7 --wheel-dir dist/ dist/*.whl
           rm -f dist/*-linux_x86_64.whl
 
       - name: Install wheel and run tests
