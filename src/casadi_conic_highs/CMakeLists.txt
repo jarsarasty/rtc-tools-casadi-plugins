@@ -48,9 +48,14 @@ foreach(var CASADI_SRC_DIR HIGHS_ROOT)
 endforeach()
 
 find_package(casadi CONFIG REQUIRED PATHS "${CASADI_ROOT}/cmake" NO_DEFAULT_PATH)
-# HiGHS static cmake config calls find_dependency(BLAS); pre-find it so the
-# target exists before highs-config.cmake tries to import it.
-find_package(BLAS REQUIRED)
+# The HiGHS static release tarball on Linux bundles libopenblas.a and its own
+# OpenBLAS cmake config. highs-config.cmake calls find_dependency(BLAS); pre-
+# satisfy it by pointing FindBLAS at the bundled library so no system BLAS is
+# needed. On Windows the MSYS2 package was built without BLAS, so skip.
+if(EXISTS "${HIGHS_ROOT}/lib/libopenblas.a")
+    set(BLAS_LIBRARIES "${HIGHS_ROOT}/lib/libopenblas.a" CACHE FILEPATH "" FORCE)
+    set(BLAS_FOUND TRUE CACHE BOOL "" FORCE)
+endif()
 find_package(highs CONFIG PATHS
     "${HIGHS_ROOT}/lib/cmake/highs"
     "${HIGHS_ROOT}/lib/cmake/HiGHS"
