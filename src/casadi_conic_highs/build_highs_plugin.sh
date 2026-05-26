@@ -63,14 +63,13 @@ echo "==> Cloning CasADi ${CASADI_VERSION} source..."
 if [[ ! -d "${CASADI_SRC_DIR}/.git" ]]; then
     _casadi_remote="https://github.com/casadi/casadi.git"
     # Fetch both bare and v-prefixed tag in one round-trip.
-    # -F: literal match; $: anchored so 3.7.2 cannot match 3.7.20.
     _ls=""
     _ls=$(git ls-remote --tags "${_casadi_remote}" \
         "refs/tags/${CASADI_VERSION}" "refs/tags/v${CASADI_VERSION}" 2>&1) \
         || { echo "ERROR: git ls-remote failed (network issue?): ${_ls}" >&2; exit 1; }
-    if echo "${_ls}" | grep -qF "refs/tags/${CASADI_VERSION}$"; then
+    if printf '%s\n' "${_ls}" | awk -v t="refs/tags/${CASADI_VERSION}" '$2==t{found=1} END{exit !found}'; then
         CASADI_TAG="${CASADI_VERSION}"
-    elif echo "${_ls}" | grep -qF "refs/tags/v${CASADI_VERSION}$"; then
+    elif printf '%s\n' "${_ls}" | awk -v t="refs/tags/v${CASADI_VERSION}" '$2==t{found=1} END{exit !found}'; then
         CASADI_TAG="v${CASADI_VERSION}"
     else
         echo "ERROR: No CasADi tag found for version '${CASADI_VERSION}'" \

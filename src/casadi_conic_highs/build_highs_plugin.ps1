@@ -170,9 +170,9 @@ if [ ! -d "`${CASADI_SRC_DIR}/.git" ]; then
     remote="https://github.com/casadi/casadi.git"
     ls_out=`$(git ls-remote --tags "`${remote}" "refs/tags/`${CASADI_VERSION}" "refs/tags/v`${CASADI_VERSION}" 2>&1) \
         || { echo "ERROR: git ls-remote failed (network issue?): `${ls_out}" >&2; exit 1; }
-    if echo "`${ls_out}" | grep -qF "refs/tags/`${CASADI_VERSION}`$"; then
+    if printf '%s\n' "`${ls_out}" | awk -v t="refs/tags/`${CASADI_VERSION}" '`$2==t{found=1} END{exit !found}'; then
         casadi_tag="`${CASADI_VERSION}"
-    elif echo "`${ls_out}" | grep -qF "refs/tags/v`${CASADI_VERSION}`$"; then
+    elif printf '%s\n' "`${ls_out}" | awk -v t="refs/tags/v`${CASADI_VERSION}" '`$2==t{found=1} END{exit !found}'; then
         casadi_tag="v`${CASADI_VERSION}"
     else
         echo "ERROR: No CasADi tag found for version '`${CASADI_VERSION}'" \
