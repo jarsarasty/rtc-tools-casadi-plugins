@@ -48,6 +48,9 @@ foreach(var CASADI_SRC_DIR HIGHS_ROOT)
 endforeach()
 
 find_package(casadi CONFIG REQUIRED PATHS "${CASADI_ROOT}/cmake" NO_DEFAULT_PATH)
+# HiGHS static cmake config calls find_dependency(BLAS); pre-find it so the
+# target exists before highs-config.cmake tries to import it.
+find_package(BLAS REQUIRED)
 find_package(highs CONFIG PATHS
     "${HIGHS_ROOT}/lib/cmake/highs"
     "${HIGHS_ROOT}/lib/cmake/HiGHS"
@@ -154,12 +157,11 @@ endif()
 if(NOT MSVC)
     target_compile_options(casadi_conic_highs PRIVATE -fvisibility=hidden)
     if(MINGW)
-        # Static-link MinGW runtimes so the plugin does not depend on
-        # libstdc++-6.dll / libgcc_s_seh-1.dll from the host toolchain.
-        # Avoids ABI conflicts when the host's runtime DLLs (e.g. those
-        # shipped inside the CasADi wheel) are older than the build toolchain.
+        # Share the MinGW C++ runtime with CasADi's wheel DLLs to avoid two
+        # copies of libstdc++ in the same process, which would break exceptions
+        # and typeinfo across the plugin boundary.
         target_link_options(casadi_conic_highs PRIVATE
-            -static-libstdc++ -shared-libgcc)
+            -shared-libstdc++ -shared-libgcc)
     endif()
 endif()
 

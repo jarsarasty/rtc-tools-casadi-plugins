@@ -22,8 +22,8 @@ jobs:
       - name: Install Python dependencies
         run: uv sync --group dev
 
-      - name: Install BLAS
-        run: sudo apt-get update && sudo apt-get install -y libblas-dev
+      - name: Install BLAS and patchelf
+        run: sudo apt-get update && sudo apt-get install -y libblas-dev patchelf
 
       - name: Build HiGHS plugin
         run: uv run bash src/casadi_conic_highs/build_highs_plugin.sh
@@ -38,8 +38,10 @@ jobs:
       - name: Build wheel
         run: uv build --wheel
 
-      - name: Tag wheel for manylinux_2_28_x86_64
-        run: uv run python -m wheel tags --platform-tag manylinux_2_28_x86_64 --remove dist/*.whl
+      - name: Repair wheel with auditwheel
+        run: |
+          uv run auditwheel repair --plat manylinux_2_28_x86_64 --wheel-dir dist/ dist/*.whl
+          rm -f dist/*-linux_x86_64.whl
 
       - name: Install wheel and run tests
         run: |
@@ -68,16 +70,6 @@ jobs:
 
       - name: Install Python dependencies
         run: uv sync --group dev
-
-      - name: Set up MSYS2
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: MINGW64
-          install: >-
-            mingw-w64-x86_64-cmake
-            mingw-w64-x86_64-ninja
-            mingw-w64-x86_64-gcc
-            mingw-w64-x86_64-highs
 
       - name: Build HiGHS plugin
         run: |

@@ -95,11 +95,11 @@ Write-Host "==> Work dir: $WorkDir"
 # Install required MSYS2 MinGW64 packages
 # ---------------------------------------------------------------------------
 
-# git and HiGHS are installed unconditionally with --needed so this is
+# All build tools are installed unconditionally with --needed so this is
 # idempotent: a no-op when already present, installs when missing.
-Write-Host "==> Installing mingw-w64-x86_64-git and mingw-w64-x86_64-highs via pacman..."
+Write-Host "==> Installing MSYS2 MinGW64 build tools via pacman..."
 $env:MSYSTEM = "MINGW64"
-& $Bash -lc "pacman -S --noconfirm --needed mingw-w64-x86_64-git mingw-w64-x86_64-highs 2>&1"
+& $Bash -lc "pacman -S --noconfirm --needed mingw-w64-x86_64-git mingw-w64-x86_64-cmake mingw-w64-x86_64-ninja mingw-w64-x86_64-gcc mingw-w64-x86_64-highs 2>&1"
 if ($LASTEXITCODE -ne 0) {
     Write-Error "pacman failed. Check your MSYS2 installation."
     exit 1
@@ -199,6 +199,7 @@ mkdir -p "`${PLUGIN_BUILD_DIR}"
 
 if [ ! -f "`${PLUGIN_BUILD_DIR}/CMakeCache.txt" ]; then
     cmake \
+        -G Ninja \
         -S "`${SCRIPT_DIR}" \
         -B "`${PLUGIN_BUILD_DIR}" \
         -DHIGHS_ROOT="`${HIGHS_ROOT}" \
