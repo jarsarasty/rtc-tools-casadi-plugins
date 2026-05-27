@@ -1,34 +1,29 @@
 """
 rtctools_highs - CasADi HiGHS solver plugin for rtc-tools.
 
-**Import side-effect**: importing this module mutates CasADi's global plugin
-search path (via ``casadi.GlobalOptions.setCasadiPath``) to prepend the
-directory containing the bundled ``libcasadi_conic_highs`` binary. This is
-intentional -- it is what makes the HiGHS solver available to CasADi without
-any manual configuration. rtc-tools triggers this automatically at its entry
-points via ``try: import rtctools_highs; except ImportError: pass``.
+Importing this module prepends the plugin directory to CasADi's plugin search
+path, making the HiGHS solver available without manual configuration.
 
-**Windows DLL isolation**: the wheel is processed by ``delvewheel`` at build
-time, which renames transitive dependencies (e.g. ``libhighs.dll`` becomes
-``libhighs-<hash>.dll``) and patches the plugin's import table accordingly.
-This eliminates naming conflicts with the ``libhighs.dll`` bundled inside
-CasADi. ``os.add_dll_directory`` is called so that Windows can locate the
-renamed dependencies when CasADi's plugin loader opens the plugin DLL.
-The handle must stay alive for the directory registration to remain active.
-
-Note: ``os.add_dll_directory`` is only effective for loaders that use
-``LoadLibraryEx`` with ``LOAD_LIBRARY_SEARCH_USER_DIRS``. CasADi 3.7.x uses
-the legacy ``LoadLibrary`` path, so the renamed deps are found via the
-``_rtctools_highs_libs`` subdirectory that ``delvewheel`` adds to PATH at
-import time rather than via the DLL directory registration.
-
-Not intended for use on macOS (the CasADi bundled HiGHS is used there instead).
+On Windows the wheel is processed by ``delvewheel`` at build time, which
+renames transitive DLL dependencies to avoid conflicts with CasADi's bundled
+versions. ``os.add_dll_directory`` is registered as a belt-and-suspenders
+measure for future CasADi versions. Not intended for use on macOS.
 """
 import os
 import sys
+from importlib.metadata import PackageNotFoundError as _PackageNotFoundError
+from importlib.metadata import version as _pkg_version
 from pathlib import Path
 
-__version__ = "1.14.0"
+try:
+    __version__ = _pkg_version("rtctools-highs")
+except _PackageNotFoundError:
+    __version__ = "unknown"
+
+# These are set at build time and reflect the versions this wheel was built against.
+# Single source of truth: pyproject.toml (via hatchling build hooks or manual bump).
+__highs_version__ = "1.14.0"
+__casadi_version__ = "3.7.2"
 
 if sys.platform == "darwin":
     raise ImportError(

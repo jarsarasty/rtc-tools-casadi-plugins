@@ -96,10 +96,33 @@ jobs:
       - name: Build wheel
         run: uv build --wheel
 
-      - name: Retag wheel as win_amd64
+      - name: Repair wheel with delvewheel
+        # delvewheel renames transitive DLLs (libhighs.dll -> libhighs-<hash>.dll)
+        # to avoid conflicts with CasADi's bundled libhighs.dll and bundles all
+        # non-system MinGW deps (including zlib1.dll). Use a separate output dir
+        # to avoid a SameFileError from --wheel-dir dist\.
+        # Note: delvewheel does not retag; a separate wheel tags step follows.
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $msys2Root = if ($env:MSYS2_ROOT) { $env:MSYS2_ROOT } else { "C:\msys64" }
+          $msys2Bin = "$msys2Root\mingw64\bin"
+          if (-not (Test-Path $msys2Bin)) {
+            throw "MSYS2 MinGW64 bin not found at $msys2Bin. Override with MSYS2_ROOT env var."
+          }
+          $whl = (Get-Item dist\*.whl).FullName
+          uv run delvewheel repair `
+            --add-path "$msys2Bin" `
+            --wheel-dir dist\repaired\ `
+            $whl
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Remove-Item dist\*.whl
+          Move-Item dist\repaired\*.whl dist\
+          Remove-Item -Recurse -Force dist\repaired\
+
+      - name: Retag wheel as cp310-cp310-win_amd64
         # hatchling emits py3-none-any because the .dll is a data file, not a
-        # Python extension. Retag to cp310-cp310-win_amd64 so the wheel is
-        # installable only on the correct platform.
+        # Python extension. delvewheel preserves the input filename; retag here
+        # so the wheel is installable only on the correct platform.
         run: |
           $whl = (Get-Item dist\*.whl).FullName
           uv run python -m wheel tags `
@@ -108,6 +131,10 @@ jobs:
 
       - name: Install wheel and run tests
         run: |
+          # Strip MSYS2 from PATH to simulate an end-user environment without MSYS2.
+          # This ensures the wheel is self-contained and does not rely on MSYS2 DLLs
+          # (e.g. zlib1.dll) being available on the system PATH.
+          $env:PATH = ($env:PATH -split ';' | Where-Object { $_ -notlike '*msys*' -and $_ -notlike '*mingw*' }) -join ';'
           uv pip install (Get-Item dist\*win_amd64*.whl).FullName
           uv run pytest tests/ -v
 

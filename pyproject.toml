@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "rtctools-highs"
-version = "1.14.0"
+version = "0.1.0"
 license = { file = "LICENSE" }
 description = "CasADi HiGHS solver plugin for RTC-Tools (pre-built binary wheel)."
 readme = "README.md"
@@ -41,6 +41,7 @@ Issues = "https://github.com/rtc-tools/rtc-tools-casadi-plugins/issues"
 dev = [
     "pytest >= 8.2.0",
     "auditwheel >= 6.1.0",
+    "delvewheel >= 1.9.0",
     "wheel >= 0.44",
 ]
 
