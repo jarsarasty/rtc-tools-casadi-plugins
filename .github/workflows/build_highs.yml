@@ -71,14 +71,9 @@ jobs:
         # dynamic Linux library.
         run: |
           whl=$(ls dist/*manylinux*.whl)
-          python3 -c "
-import sys, zipfile
-names = zipfile.ZipFile(sys.argv[1]).namelist()
-leaked = [n for n in names if '/libhighs' in n]
-if leaked:
-    sys.exit(f'ERROR: libhighs.so found in wheel (should be excluded): {leaked}')
-print('OK: no libhighs.so in wheel')
-" "$whl"
+          leaked=$(python3 -c "import zipfile,sys; print('\n'.join(n for n in zipfile.ZipFile(sys.argv[1]).namelist() if '/libhighs' in n))" "$whl")
+          if [ -n "$leaked" ]; then echo "ERROR: libhighs found in wheel: $leaked"; exit 1; fi
+          echo "OK: no libhighs in wheel"
 
       - name: Install wheel and run tests
         run: |
@@ -169,18 +164,12 @@ print('OK: no libhighs.so in wheel')
         # tests would still pass, so this structural check is the only CI signal.
         run: |
           $whl = (Get-Item dist\*win_amd64*.whl).FullName
-          uv run python -c @"
-import sys, zipfile, pathlib
-whl = zipfile.ZipFile(sys.argv[1])
-names = whl.namelist()
-renamed = [n for n in names if pathlib.Path(n).name.startswith('libhighs-')]
-bare    = [n for n in names if pathlib.Path(n).name == 'libhighs.dll']
-if not renamed:
-    sys.exit('ERROR: libhighs-<hash>.dll not found in wheel -- delvewheel rename may have been skipped')
-if bare:
-    sys.exit(f'ERROR: un-renamed libhighs.dll found in wheel: {bare}')
-print(f'OK: libhighs renamed correctly -> {renamed}')
-"@ $whl
+          $names = uv run python -c "import zipfile,sys; print('\n'.join(zipfile.ZipFile(sys.argv[1]).namelist()))" $whl
+          $renamed = $names | Where-Object { [System.IO.Path]::GetFileName($_).StartsWith('libhighs-') }
+          $bare    = $names | Where-Object { [System.IO.Path]::GetFileName($_) -eq 'libhighs.dll' }
+          if (-not $renamed) { Write-Error 'libhighs-<hash>.dll not found in wheel -- delvewheel rename may have been skipped'; exit 1 }
+          if ($bare)         { Write-Error "un-renamed libhighs.dll found in wheel: $bare"; exit 1 }
+          Write-Host "OK: libhighs renamed correctly -> $renamed"
 
       - name: Install wheel and run tests
         run: |
