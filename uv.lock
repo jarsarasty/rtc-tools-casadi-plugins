@@ -314,7 +314,7 @@ wheels = [
 
 [[package]]
 name = "rtctools-highs"
-version = "0.1.1"
+version = "0.1.2"
 source = { editable = "." }
 dependencies = [
     { name = "casadi" },
@@ -333,7 +333,7 @@ requires-dist = [{ name = "casadi", specifier = "==3.7.2" }]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "auditwheel", specifier = ">=6.1.0" },
+    { name = "auditwheel", specifier = ">=6.2.0" },
     { name = "delvewheel", specifier = ">=1.9.0" },
     { name = "pytest", specifier = ">=8.2.0" },
     { name = "wheel", specifier = ">=0.44" },
