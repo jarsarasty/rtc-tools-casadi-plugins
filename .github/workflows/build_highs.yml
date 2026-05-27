@@ -43,10 +43,11 @@ jobs:
       - name: Retag wheel as native before auditwheel
         # hatchling emits py3-none-any because the .so is a data file, not a
         # Python extension. auditwheel requires a platform tag to deduce the
-        # architecture. Retag to cp310-cp310-linux_x86_64 first.
+        # architecture. Tag all Python versions supported by CasADi 3.7.2 (cp310-cp314).
+        # abi-tag none: the wheel has no CPython ABI dependency (matches CasADi's convention).
         run: |
           uv run python -m wheel tags \
-            --python-tag cp310 --abi-tag cp310 --platform-tag linux_x86_64 \
+            --python-tag cp310.cp311.cp312.cp313.cp314 --abi-tag none --platform-tag linux_x86_64 \
             --remove dist/*.whl
 
       - name: Repair wheel with auditwheel
@@ -119,14 +120,14 @@ jobs:
           Move-Item dist\repaired\*.whl dist\
           Remove-Item -Recurse -Force dist\repaired\
 
-      - name: Retag wheel as cp310-cp310-win_amd64
-        # hatchling emits py3-none-any because the .dll is a data file, not a
-        # Python extension. delvewheel preserves the input filename; retag here
-        # so the wheel is installable only on the correct platform.
+      - name: Retag wheel as cp310.cp311.cp312.cp313.cp314-none-win_amd64
+        # hatchling emits py3-none-any; delvewheel preserves the input filename.
+        # Tag all Python versions supported by CasADi 3.7.2 on Windows (cp310-cp314).
+        # abi-tag none: the wheel has no CPython ABI dependency (matches CasADi's convention).
         run: |
           $whl = (Get-Item dist\*.whl).FullName
           uv run python -m wheel tags `
-            --python-tag cp310 --abi-tag cp310 --platform-tag win_amd64 `
+            --python-tag cp310.cp311.cp312.cp313.cp314 --abi-tag none --platform-tag win_amd64 `
             --remove $whl
 
       - name: Install wheel and run tests
