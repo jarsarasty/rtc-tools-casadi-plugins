@@ -4,6 +4,7 @@ import os
 import re
 import sys
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import casadi
 import pytest
@@ -33,6 +34,19 @@ def _load_from(directory):
     return module
 
 
+def _load_from_patched(directory):
+    """Like _load_from but patches ctypes.CDLL to a no-op on Linux.
+
+    Tests that call _load_from with a dummy .touch()ed .so need this on Linux
+    because the real CDLL call would fail on an empty (non-ELF) file.  The
+    patch simulates a successful dlopen so we can test everything else.
+    """
+    if sys.platform != "linux":
+        return _load_from(directory)
+    with patch("ctypes.CDLL", return_value=MagicMock()):
+        return _load_from(directory)
+
+
 def _write_init(directory):
     (directory / "__init__.py").write_text(
         _INIT_SRC.read_text(encoding="utf-8"), encoding="utf-8"
@@ -58,13 +72,13 @@ class TestBinaryPresent:
         """No ImportError when a matching plugin file is present."""
         (tmp_path / _PLUGIN_BINARY).touch()
         _write_init(tmp_path)
-        _load_from(tmp_path)  # must not raise
+        _load_from_patched(tmp_path)  # must not raise
 
     def test_plugin_dir_added_to_casadi_path(self, tmp_path):
         """Plugin directory is prepended to CasADi's search path after import."""
         (tmp_path / _PLUGIN_BINARY).touch()
         _write_init(tmp_path)
-        _load_from(tmp_path)
+        _load_from_patched(tmp_path)
 
         path_parts = [p for p in casadi.GlobalOptions.getCasadiPath().split(os.pathsep) if p]
         assert str(tmp_path) in path_parts
@@ -74,8 +88,8 @@ class TestBinaryPresent:
         (tmp_path / _PLUGIN_BINARY).touch()
         _write_init(tmp_path)
 
-        _load_from(tmp_path)
-        _load_from(tmp_path)
+        _load_from_patched(tmp_path)
+        _load_from_patched(tmp_path)
 
         path_parts = [p for p in casadi.GlobalOptions.getCasadiPath().split(os.pathsep) if p]
         assert path_parts.count(str(tmp_path)) == 1
@@ -96,7 +110,7 @@ class TestVersion:
         """__version__ is exposed and follows semver after a successful import."""
         (tmp_path / _PLUGIN_BINARY).touch()
         _write_init(tmp_path)
-        module = _load_from(tmp_path)
+        module = _load_from_patched(tmp_path)
         assert hasattr(module, "__version__")
         assert re.match(r"\d+\.\d+\.\d+", module.__version__)
 
@@ -127,3 +141,55 @@ class TestWindowsPathPrepend:
 
         path_entries = os.environ["PATH"].split(os.pathsep)
         assert libs_dir not in path_entries
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Linux-only")
+class TestLinuxCtypesForceLoad:
+    """Tests for the ctypes.CDLL force-load added to guard against CasADi's silent
+    fallthrough when a transitive dependency can't be resolved."""
+
+    def test_import_error_on_dlopen_failure(self, tmp_path):
+        """ImportError with a clear dependency hint when ctypes.CDLL raises OSError."""
+        (tmp_path / _PLUGIN_BINARY).touch()
+        _write_init(tmp_path)
+        with patch("ctypes.CDLL", side_effect=OSError("libz.so.1: cannot open shared object file")):
+            with pytest.raises(ImportError, match="cannot load"):
+                _load_from(tmp_path)
+
+    def test_import_error_message_names_so(self, tmp_path):
+        """The ImportError message includes the path to the failing .so."""
+        (tmp_path / _PLUGIN_BINARY).touch()
+        _write_init(tmp_path)
+        with patch("ctypes.CDLL", side_effect=OSError("libz.so.1: cannot open")):
+            with pytest.raises(ImportError, match="libcasadi_conic_highs.so"):
+                _load_from(tmp_path)
+
+    def test_import_error_message_suggests_dependency(self, tmp_path):
+        """The ImportError message hints at transitive dep resolution."""
+        (tmp_path / _PLUGIN_BINARY).touch()
+        _write_init(tmp_path)
+        with patch("ctypes.CDLL", side_effect=OSError("not found")):
+            with pytest.raises(ImportError, match="transitive dependency"):
+                _load_from(tmp_path)
+
+    def test_successful_dlopen_does_not_raise(self, tmp_path):
+        """No error when ctypes.CDLL succeeds (mocked as a no-op)."""
+        (tmp_path / _PLUGIN_BINARY).touch()
+        _write_init(tmp_path)
+        with patch("ctypes.CDLL", return_value=MagicMock()):
+            _load_from(tmp_path)  # must not raise
+
+    def test_cdll_called_with_absolute_path(self, tmp_path):
+        """ctypes.CDLL is called with an absolute path, not a bare filename.
+
+        Passing a bare filename would let LD_LIBRARY_PATH point to the wrong
+        .so (e.g. the bundled casadi/ copy), defeating the force-load purpose.
+        """
+        (tmp_path / _PLUGIN_BINARY).touch()
+        _write_init(tmp_path)
+        with patch("ctypes.CDLL", return_value=MagicMock()) as mock_cdll:
+            _load_from(tmp_path)
+        assert mock_cdll.call_count >= 1
+        called_path = mock_cdll.call_args[0][0]
+        assert os.path.isabs(called_path), f"Expected absolute path, got: {called_path}"
+        assert called_path.endswith(_PLUGIN_BINARY)

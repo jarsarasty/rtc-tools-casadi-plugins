@@ -50,6 +50,25 @@ if sys.platform == "win32":
         # LOAD_LIBRARY_SEARCH_USER_DIRS — at that point add_dll_directory() suffices.
         os.environ["PATH"] = os.pathsep.join([_libs_dir, os.environ["PATH"]])
     _dll_dir = os.add_dll_directory(str(_plugin_dir))  # handle must stay alive
+elif sys.platform == "linux":
+    # Prime glibc's linker cache with our plugin before importing casadi.
+    # CasADi caches plugins on first dlopen() and silently falls through to
+    # the next search path on failure — without this, its bundled HiGHS 1.10.0
+    # wins instead of ours.
+    import ctypes as _ctypes
+
+    _plugin_so = _plugin_dir / "libcasadi_conic_highs.so"
+    _RTLD_NOW = getattr(_ctypes, "RTLD_NOW", None) or getattr(os, "RTLD_NOW", 2)
+    try:
+        _ctypes.CDLL(str(_plugin_so), mode=_RTLD_NOW)
+    except OSError as _e:
+        raise ImportError(
+            f"rtctools_highs: cannot load {_plugin_so}: {_e}. "
+            "A transitive dependency (libcasadi.so.3.7, libz.so.1, libgomp.so.1, "
+            "libstdc++, etc.) could not be resolved. "
+            "Install the matching casadi wheel first, or check that all system "
+            "libraries required by the wheel are present."
+        ) from _e
 
 import casadi  # noqa: E402
 
