@@ -99,3 +99,31 @@ class TestVersion:
         module = _load_from(tmp_path)
         assert hasattr(module, "__version__")
         assert re.match(r"\d+\.\d+\.\d+", module.__version__)
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only")
+class TestWindowsPathPrepend:
+    def test_libs_dir_prepended_to_path(self, tmp_path, monkeypatch):
+        """rtctools_highs.libs/ is prepended to PATH when the directory exists."""
+        (tmp_path / _PLUGIN_BINARY).touch()
+        libs_dir = tmp_path.parent / "rtctools_highs.libs"
+        _write_init(tmp_path)
+
+        monkeypatch.setenv("PATH", os.environ.get("PATH", ""))
+        monkeypatch.setattr("os.path.isdir", lambda p: p == str(libs_dir))
+        _load_from(tmp_path)
+
+        assert os.environ["PATH"].startswith(str(libs_dir) + os.pathsep)
+
+    def test_path_unchanged_without_libs_dir(self, tmp_path, monkeypatch):
+        """libs/ absent — its path must not appear as a PATH entry after import."""
+        (tmp_path / _PLUGIN_BINARY).touch()
+        libs_dir = str(tmp_path.parent / "rtctools_highs.libs")
+        _write_init(tmp_path)
+
+        monkeypatch.setenv("PATH", os.environ.get("PATH", ""))
+        monkeypatch.setattr("os.path.isdir", lambda p: False)
+        _load_from(tmp_path)
+
+        path_entries = os.environ["PATH"].split(os.pathsep)
+        assert libs_dir not in path_entries

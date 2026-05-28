@@ -14,3 +14,9 @@ build/
 # IDE
 .idea/
 .vscode/
+
+# Local CI
+ci-work/
+rtc-tools-src/
+highs-plugin-delivery-plan.md
+examples/

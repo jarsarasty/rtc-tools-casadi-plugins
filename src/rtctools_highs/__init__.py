@@ -6,8 +6,9 @@ path, making the HiGHS solver available without manual configuration.
 
 On Windows the wheel is processed by ``delvewheel`` at build time, which
 renames transitive DLL dependencies (e.g. ``libhighs-<hash>.dll``) to avoid
-conflicts with CasADi's bundled copies and injects a loader shim into this
-file. Not intended for use on macOS.
+conflicts with CasADi's bundled copies. The renamed DLLs land in
+``rtctools_highs.libs/``, which is prepended to PATH at import time so that
+CasADi's ``LoadLibrary()`` can find them. Not intended for use on macOS.
 """
 import os
 import sys
@@ -42,11 +43,12 @@ if not any(_plugin_dir.glob(f"libcasadi_conic_highs*{_suffix}")):
     )
 
 if sys.platform == "win32":
-    # delvewheel injects a loader shim at the top of this file at repair time;
-    # the shim covers rtctools_highs.libs/ (renamed transitive deps, e.g.
-    # libhighs-<hash>.dll) via both PATH and os.add_dll_directory.
-    # This call covers the package directory itself (libcasadi_conic_highs.dll)
-    # for any future CasADi that uses LoadLibraryEx with user-dirs search.
+    _libs_dir = str(_plugin_dir.parent / "rtctools_highs.libs")
+    if os.path.isdir(_libs_dir):
+        # CasADi 3.7.x resolves transitive DLL deps via PATH (plain LoadLibrary).
+        # Superseded by CasADi #4340 (3.8+), which switches to LoadLibraryEx +
+        # LOAD_LIBRARY_SEARCH_USER_DIRS — at that point add_dll_directory() suffices.
+        os.environ["PATH"] = os.pathsep.join([_libs_dir, os.environ["PATH"]])
     _dll_dir = os.add_dll_directory(str(_plugin_dir))  # handle must stay alive
 
 import casadi  # noqa: E402

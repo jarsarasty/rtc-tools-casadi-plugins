@@ -120,7 +120,7 @@ jobs:
         # --analyze-existing: libcasadi_conic_highs.dll is a data-file DLL (not .pyd),
         # so delvewheel won't scan it unless told to. This finds libhighs.dll as an
         # external dep, renames it to libhighs-<hash>.dll (avoids CasADi's bundled
-        # copy), patches the import table, and injects a PATH shim into __init__.py.
+        # copy), and patches the import table.
         # --exclude libcasadi.dll: also a dep of the plugin; provided by the casadi
         # wheel — must not be vendored (same rationale as --exclude libcasadi.so.3.7 on Linux).
         # --add-path "$pluginDir": where libhighs.dll lives (cmake output).
@@ -174,8 +174,13 @@ jobs:
         run: |
           # Strip MSYS2 from PATH to verify the wheel is self-contained (no zlib1.dll etc. leaking in).
           $env:PATH = ($env:PATH -split ';' | Where-Object { $_ -notlike '*msys*' -and $_ -notlike '*mingw*' }) -join ';'
+          uv pip uninstall rtctools-highs
           uv pip install (Get-Item dist\*win_amd64*.whl).FullName
-          uv run pytest tests/ -v
+          uv pip install rtc-tools
+          $rtcVersion = uv run python -c "import rtctools; print(rtctools.__version__)"
+          git clone --depth 1 --branch $rtcVersion https://github.com/rtc-tools/rtc-tools.git rtc-tools-src
+          $env:RTCTOOLS_EXAMPLE_DIR = "rtc-tools-src\examples\pumped_hydropower_system"
+          uv run pytest tests/ tests/e2e/ -v
 
       - uses: actions/upload-artifact@v4
         with:
