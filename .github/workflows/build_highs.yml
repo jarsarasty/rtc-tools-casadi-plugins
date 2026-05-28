@@ -32,10 +32,19 @@ jobs:
           path: ci-work/highs-1.14.0
           key: highs-1.14.0-linux-${{ runner.os }}-v1
 
+      - name: Cache repaired wheel
+        id: cache-wheel
+        uses: actions/cache@v4
+        with:
+          path: dist
+          key: wheel-linux-${{ hashFiles('src/casadi_conic_highs/**', 'src/rtctools_highs/**', 'pyproject.toml') }}-highs-1.14.0-v1
+
       - name: Build HiGHS plugin
+        if: steps.cache-wheel.outputs.cache-hit != 'true'
         run: uv run bash src/casadi_conic_highs/build_highs_plugin.sh
 
       - name: Stage plugin artifacts
+        if: steps.cache-wheel.outputs.cache-hit != 'true'
         run: |
           plugin_dir=$(cat ci-work/plugin-lib-path.txt)
           cp "$plugin_dir"/libcasadi_conic_highs*.so src/rtctools_highs/
@@ -43,9 +52,11 @@ jobs:
           if [ -f "$plugin_dir/libhighs.so" ]; then cp "$plugin_dir/libhighs.so" src/rtctools_highs/; fi
 
       - name: Build wheel
+        if: steps.cache-wheel.outputs.cache-hit != 'true'
         run: uv build --wheel
 
       - name: Retag wheel as native before auditwheel
+        if: steps.cache-wheel.outputs.cache-hit != 'true'
         # hatchling emits py3-none-any (data-file .so); auditwheel needs a platform tag.
         # abi-tag none: no CPython ABI dependency (matches CasADi's convention).
         run: |
@@ -54,6 +65,7 @@ jobs:
             --remove dist/*.whl
 
       - name: Repair wheel with auditwheel
+        if: steps.cache-wheel.outputs.cache-hit != 'true'
         # --exclude libcasadi.so.3.7: provided by the casadi wheel; must not be vendored.
         # --exclude libhighs.so / libhighs.so.*: guard against a future dynamic HiGHS Linux
         #   release (static-only today) being pre-staged and bundled unrenamed. Both the
@@ -69,6 +81,7 @@ jobs:
           rm -f dist/*-linux_x86_64.whl
 
       - name: Verify wheel contents
+        if: steps.cache-wheel.outputs.cache-hit != 'true'
         # Guard: no-op today (static HiGHS), catches a missed --exclude if HiGHS ever ships a .so.
         run: |
           whl=$(ls dist/*manylinux*.whl)
