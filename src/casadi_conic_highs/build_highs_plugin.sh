@@ -64,6 +64,7 @@ if [[ "${OS}" == "Linux" ]]; then
         cmake -S "${HIGHS_SRC_DIR}" -B "${HIGHS_BUILD_DIR}" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX="${HIGHS_DIR}" \
+            -DCMAKE_INSTALL_LIBDIR=lib \
             -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
             -DHIPO=OFF \
             -DZLIB=OFF \
